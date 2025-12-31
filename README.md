@@ -93,15 +93,38 @@ pnpm build
 - Prettier 포맷 검사
 - 빌드 검증
 
+### Development Workflow
+
+```
+1. main 브랜치에서 feature 브랜치 생성
+   └─ git checkout -b feat/new-feature
+
+2. 작업 후 PR 생성
+   └─ git push origin feat/new-feature
+
+3. 코드 리뷰 + CI 통과 후 main에 병합
+
+4. 릴리스 필요 시 Release workflow 실행
+   └─ GitHub Actions → Release → Run workflow
+```
+
 ### Release
 
-버전 태그 push 시 자동 릴리스:
+GitHub Actions에서 수동으로 릴리스를 트리거합니다:
 
-```bash
-# 버전 태그 생성 및 push
-git tag v1.0.0
-git push origin v1.0.0
-```
+1. **Actions** 탭 → **Release** workflow 선택
+2. **Run workflow** 클릭
+3. **Version type** 선택:
+   - `patch`: 버그 수정 (1.0.0 → 1.0.1)
+   - `minor`: 기능 추가 (1.0.0 → 1.1.0)
+   - `major`: 호환성 깨는 변경 (1.0.0 → 2.0.0)
+4. **Run workflow** 실행
+
+워크플로우가 자동으로:
+- `package.json` 버전 업데이트
+- 빌드 실행
+- Git 태그 생성 및 push
+- GitHub Release 생성 (zip 파일 첨부)
 
 ## Usage
 
