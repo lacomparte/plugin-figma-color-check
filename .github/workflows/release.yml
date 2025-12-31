@@ -1,9 +1,16 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version_type:
+        description: 'Version type'
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
 
 jobs:
   release:
@@ -13,6 +20,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -23,23 +32,43 @@ jobs:
           node-version: '20'
           cache: 'pnpm'
 
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Bump version
+        id: version
+        run: |
+          npm version ${{ inputs.version_type }} --no-git-tag-version
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
       - name: Build
         run: pnpm build
+
+      - name: Commit and tag
+        run: |
+          git add package.json
+          git commit -m "chore: release v${{ steps.version.outputs.version }}"
+          git tag v${{ steps.version.outputs.version }}
+          git push origin main --tags
 
       - name: Create release package
         run: |
           mkdir -p release
           cp -r dist release/
           cp manifest.json release/
-          cd release && zip -r ../figma-color-checker-${{ github.ref_name }}.zip .
+          cd release && zip -r ../figma-color-checker-v${{ steps.version.outputs.version }}.zip .
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: figma-color-checker-${{ github.ref_name }}.zip
+          tag_name: v${{ steps.version.outputs.version }}
+          files: figma-color-checker-v${{ steps.version.outputs.version }}.zip
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
