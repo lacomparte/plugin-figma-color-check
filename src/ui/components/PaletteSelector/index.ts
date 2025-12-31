@@ -1,0 +1,1 @@
+export { PaletteSelector } from './PaletteSelector';

@@ -1,0 +1,50 @@
+{
+  "name": "design-system-color-checker",
+  "version": "1.0.0",
+  "description": "디자인 시스템 컬러 팔레트 준수 여부 검사 플러그인",
+  "type": "module",
+  "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "scripts": {
+    "dev": "concurrently \"pnpm run dev:code\" \"pnpm run dev:ui\"",
+    "dev:code": "vite build --config vite.config.code.ts --watch --mode development",
+    "dev:ui": "vite build --config vite.config.ui.ts --watch --mode development",
+    "build": "pnpm run clean && pnpm run build:code && pnpm run build:ui",
+    "build:code": "vite build --config vite.config.code.ts",
+    "build:ui": "vite build --config vite.config.ui.ts",
+    "clean": "rm -rf dist && mkdir -p dist",
+    "lint": "eslint . --ext .ts,.tsx",
+    "lint:fix": "eslint . --ext .ts,.tsx --fix",
+    "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\"",
+    "typecheck": "tsc --noEmit"
+  },
+  "author": "",
+  "license": "",
+  "dependencies": {
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@figma/eslint-plugin-figma-plugins": "*",
+    "@figma/plugin-typings": "^1.96.0",
+    "@types/node": "^25.0.3",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "@vitejs/plugin-react": "^4.3.0",
+    "concurrently": "^9.1.0",
+    "eslint": "^8.57.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-react": "^7.37.0",
+    "eslint-plugin-react-hooks": "^5.0.0",
+    "prettier": "^3.4.0",
+    "typescript": "^5.7.0",
+    "vite": "^5.4.0",
+    "vite-plugin-singlefile": "^2.0.0"
+  }
+}

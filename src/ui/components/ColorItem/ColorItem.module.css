@@ -1,0 +1,139 @@
+.container {
+  padding: var(--spacing-md);
+  background: var(--bg-secondary);
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--spacing-sm);
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-md);
+}
+
+.swatch {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.info {
+  flex: 1;
+  min-width: 0;
+}
+
+.hexRow {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-xs);
+}
+
+.hex {
+  font-size: var(--font-size-base);
+  font-weight: 600;
+  color: var(--text-primary);
+  font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+}
+
+.family {
+  padding: 2px var(--spacing-xs);
+  font-size: var(--font-size-xs);
+  border-radius: var(--radius-sm);
+}
+
+.familyGrayscale {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+
+.familyBlue {
+  background: rgba(36, 94, 255, 0.1);
+  color: var(--accent-blue);
+}
+
+.familyRed {
+  background: rgba(243, 17, 16, 0.1);
+  color: var(--accent-red);
+}
+
+.familyYellow {
+  background: rgba(250, 146, 0, 0.1);
+  color: #fa9200;
+}
+
+.familyOther {
+  background: var(--bg-tertiary);
+  color: var(--text-tertiary);
+}
+
+.nodeButton {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: 0;
+  font-size: var(--font-size-sm);
+  text-align: left;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--accent-blue);
+}
+
+.nodeButton:hover {
+  text-decoration: underline;
+}
+
+.nodeName {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.propertyType {
+  color: var(--text-tertiary);
+  font-size: var(--font-size-xs);
+}
+
+.suggestion {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-sm);
+  padding-top: var(--spacing-sm);
+  border-top: 1px solid var(--border-color);
+}
+
+.arrow {
+  color: var(--text-tertiary);
+  font-size: var(--font-size-lg);
+}
+
+.suggestionColor {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex: 1;
+}
+
+.suggestionSwatch {
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+}
+
+.suggestionName {
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.suggestionHex {
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary);
+  font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+}

@@ -1,0 +1,24 @@
+# Node
+*.log
+*.log.*
+node_modules
+
+# Build output
+out/
+dist/
+code.js
+
+# IDE
+.idea/
+*.swp
+*.swo
+.vscode/
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
