@@ -1,11 +1,5 @@
 import type { ReactNode } from 'react';
-import {
-  ActionButtons,
-  Header,
-  PaletteSelector,
-  ResultList,
-  Stats,
-} from './components';
+import { ActionButtons, Header, PaletteSelector, ResultList, Stats } from './components';
 import { ScanProvider } from './context/ScanContext';
 import './styles/global.css';
 

@@ -183,9 +183,7 @@ async function getVariableCollections(): Promise<void> {
  */
 async function loadVariableColors(collectionId: string): Promise<ColorToken[]> {
   const colorVariables = await figma.variables.getLocalVariablesAsync('COLOR');
-  const collectionColors = colorVariables.filter(
-    (v) => v.variableCollectionId === collectionId
-  );
+  const collectionColors = colorVariables.filter((v) => v.variableCollectionId === collectionId);
 
   const colors: ColorToken[] = [];
 
@@ -576,11 +574,7 @@ async function fixColor(payload: FixColorPayload): Promise<void> {
       const fills = JSON.parse(JSON.stringify(node.fills)) as Paint[];
       const updatedFills = fills.map((fill) => {
         if (fill.type === 'SOLID') {
-          const currentHex = figmaRgbToHex(
-            fill.color.r,
-            fill.color.g,
-            fill.color.b
-          );
+          const currentHex = figmaRgbToHex(fill.color.r, fill.color.g, fill.color.b);
           if (currentHex.toUpperCase() === payload.originalHex.toUpperCase()) {
             return {
               ...fill,
@@ -603,11 +597,7 @@ async function fixColor(payload: FixColorPayload): Promise<void> {
       const strokes = JSON.parse(JSON.stringify(node.strokes)) as Paint[];
       const updatedStrokes = strokes.map((stroke) => {
         if (stroke.type === 'SOLID') {
-          const currentHex = figmaRgbToHex(
-            stroke.color.r,
-            stroke.color.g,
-            stroke.color.b
-          );
+          const currentHex = figmaRgbToHex(stroke.color.r, stroke.color.g, stroke.color.b);
           if (currentHex.toUpperCase() === payload.originalHex.toUpperCase()) {
             return {
               ...stroke,
@@ -660,11 +650,7 @@ async function fixAllColors(payload: FixAllPayload): Promise<void> {
         const fills = JSON.parse(JSON.stringify(node.fills)) as Paint[];
         const updatedFills = fills.map((fill) => {
           if (fill.type === 'SOLID') {
-            const currentHex = figmaRgbToHex(
-              fill.color.r,
-              fill.color.g,
-              fill.color.b
-            );
+            const currentHex = figmaRgbToHex(fill.color.r, fill.color.g, fill.color.b);
             if (currentHex.toUpperCase() === fix.originalHex.toUpperCase()) {
               return {
                 ...fill,
@@ -687,11 +673,7 @@ async function fixAllColors(payload: FixAllPayload): Promise<void> {
         const strokes = JSON.parse(JSON.stringify(node.strokes)) as Paint[];
         const updatedStrokes = strokes.map((stroke) => {
           if (stroke.type === 'SOLID') {
-            const currentHex = figmaRgbToHex(
-              stroke.color.r,
-              stroke.color.g,
-              stroke.color.b
-            );
+            const currentHex = figmaRgbToHex(stroke.color.r, stroke.color.g, stroke.color.b);
             if (currentHex.toUpperCase() === fix.originalHex.toUpperCase()) {
               return {
                 ...stroke,

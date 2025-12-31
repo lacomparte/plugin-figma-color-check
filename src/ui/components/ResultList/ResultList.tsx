@@ -13,9 +13,8 @@ const hasViolations = (count: number): boolean => count > 0;
 /**
  * 순수 함수: 수정 가능한 색상 있는지 확인
  */
-const hasFixableSuggestions = (
-  usages: readonly { suggestion?: unknown }[]
-): boolean => usages.some((usage) => usage.suggestion !== null && usage.suggestion !== undefined);
+const hasFixableSuggestions = (usages: readonly { suggestion?: unknown }[]): boolean =>
+  usages.some((usage) => usage.suggestion !== null && usage.suggestion !== undefined);
 
 export const ResultList = (): ReactNode => {
   const { state, fixAllColors } = useScan();

@@ -11,11 +11,7 @@ export type ColorFamily = 'grayscale' | 'blue' | 'red' | 'yellow' | 'other';
  * @param b - Blue (0-255)
  * @returns ColorFamily
  */
-export function determineColorFamily(
-  r: number,
-  g: number,
-  b: number
-): ColorFamily {
+export function determineColorFamily(r: number, g: number, b: number): ColorFamily {
   // RGB를 0-1 범위로 정규화
   const rNorm = r / 255;
   const gNorm = g / 255;
