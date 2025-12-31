@@ -12,7 +12,10 @@ const normalizeString = (str: string): string => str.toLowerCase().replace(/\s+/
 /**
  * 순수 함수: 팔레트 필터링 (공백 무시, 대소문자 무시)
  */
-const filterPalettes = (palettes: readonly PaletteInfo[], query: string): readonly PaletteInfo[] => {
+const filterPalettes = (
+  palettes: readonly PaletteInfo[],
+  query: string
+): readonly PaletteInfo[] => {
   if (query.trim() === '') {
     return palettes;
   }
@@ -33,7 +36,8 @@ const getSourceTypeLabel = (sourceType: PaletteInfo['sourceType']): string => {
 };
 
 export const PaletteSelector = (): ReactNode => {
-  const { state, selectPalette, loadVariableCollections, loadPages, goToPage, allPalettes } = useScan();
+  const { state, selectPalette, loadVariableCollections, loadPages, goToPage, allPalettes } =
+    useScan();
   const [searchQuery, setSearchQuery] = useState('');
   const [isOpen, setIsOpen] = useState(false);
 
@@ -108,7 +112,8 @@ export const PaletteSelector = (): ReactNode => {
             </span>
           </div>
         )}
-        {isOpen && filteredPalettes.length > 0 ? <ul className={styles.dropdown}>
+        {isOpen && filteredPalettes.length > 0 ? (
+          <ul className={styles.dropdown}>
             {filteredPalettes.map((palette) => (
               <li key={palette.id} className={styles.dropdownItem}>
                 <button
@@ -140,8 +145,11 @@ export const PaletteSelector = (): ReactNode => {
                 )}
               </li>
             ))}
-          </ul> : null}
-        {isOpen && filteredPalettes.length === 0 && searchQuery !== '' ? <div className={styles.noResults}>검색 결과가 없습니다</div> : null}
+          </ul>
+        ) : null}
+        {isOpen && filteredPalettes.length === 0 && searchQuery !== '' ? (
+          <div className={styles.noResults}>검색 결과가 없습니다</div>
+        ) : null}
       </div>
     </div>
   );

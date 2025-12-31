@@ -1,11 +1,4 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useMemo,
-  useReducer,
-  type ReactNode,
-} from 'react';
+import { createContext, useCallback, useContext, useMemo, useReducer, type ReactNode } from 'react';
 import type {
   ColorFixRequest,
   ColorUsage,
@@ -205,8 +198,9 @@ export const ScanProvider = ({ children }: ScanProviderProps): ReactNode => {
   const fixAllColors = useCallback((): void => {
     const usages = state.scanResult?.colorUsages ?? [];
     const fixes: ColorFixRequest[] = usages
-      .filter((usage): usage is ColorUsage & { suggestion: NonNullable<ColorUsage['suggestion']> } =>
-        usage.suggestion !== null && usage.suggestion !== undefined
+      .filter(
+        (usage): usage is ColorUsage & { suggestion: NonNullable<ColorUsage['suggestion']> } =>
+          usage.suggestion !== null && usage.suggestion !== undefined
       )
       .map((usage) => ({
         nodeId: usage.nodeId,
@@ -252,7 +246,12 @@ export const ScanProvider = ({ children }: ScanProviderProps): ReactNode => {
   }, []);
 
   const allPalettes = useMemo((): readonly PaletteInfo[] => {
-    console.log('[ScanContext] Computing allPalettes. pages:', state.pages, 'variableCollections:', state.variableCollections);
+    console.log(
+      '[ScanContext] Computing allPalettes. pages:',
+      state.pages,
+      'variableCollections:',
+      state.variableCollections
+    );
     const variablePalettes: PaletteInfo[] = state.variableCollections.map((collection) => ({
       id: collection.id,
       name: collection.name,
