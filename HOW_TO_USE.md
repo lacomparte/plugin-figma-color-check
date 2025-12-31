@@ -4,11 +4,59 @@ Figma Design System Color Checker 플러그인 사용 방법을 설명합니다.
 
 ## 목차
 
-1. [플러그인 실행](#플러그인-실행)
-2. [팔레트 선택](#팔레트-선택)
-3. [색상 검사](#색상-검사)
-4. [결과 확인](#결과-확인)
-5. [색상 수정](#색상-수정)
+1. [설치 방법](#설치-방법)
+2. [플러그인 실행](#플러그인-실행)
+3. [팔레트 선택](#팔레트-선택)
+4. [색상 검사](#색상-검사)
+5. [결과 확인](#결과-확인)
+6. [색상 수정](#색상-수정)
+
+---
+
+## 설치 방법
+
+### 방법 1: Figma Community에서 설치 (권장)
+
+가장 간단한 방법으로, Figma Community에서 바로 설치할 수 있습니다.
+
+1. Figma Desktop 또는 웹에서 **Community** 탭으로 이동
+2. 검색창에 **"Design System Color Checker"** 입력
+3. 플러그인 페이지에서 **Install** 버튼 클릭
+4. 설치 완료 후 모든 Figma 파일에서 사용 가능
+
+### 방법 2: 소스 코드에서 직접 빌드
+
+개발 또는 커스터마이징이 필요한 경우 소스 코드에서 직접 빌드할 수 있습니다.
+
+#### 사전 요구사항
+
+- Node.js 20 이상
+- pnpm 9 이상
+- Figma Desktop App
+
+#### 설치 단계
+
+```bash
+# 1. 저장소 클론
+git clone https://github.com/lacomparte/plugin-figma-color-check.git
+cd plugin-figma-color-check
+
+# 2. 의존성 설치
+pnpm install
+
+# 3. 프로덕션 빌드
+pnpm build
+```
+
+#### Figma에 플러그인 등록
+
+1. Figma Desktop 앱 실행
+2. 아무 파일이나 열기
+3. 상단 메뉴에서 **Plugins** > **Development** > **Import plugin from manifest...** 클릭
+4. 클론한 프로젝트 폴더의 `manifest.json` 파일 선택
+5. 플러그인이 **Development** 메뉴에 등록됨
+
+> 💡 **개발 모드**: 코드 수정 시 `pnpm dev`를 실행하면 변경사항이 자동으로 반영됩니다.
 
 ---
 
