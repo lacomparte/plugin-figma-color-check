@@ -1,0 +1,1 @@
+# plugin-figma-color-check
