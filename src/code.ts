@@ -114,16 +114,26 @@ async function addUrlPalette(request: AddUrlPaletteRequest): Promise<void> {
     }
 
     // 여러 개 발견되면 첫 번째 사용
-    const node = allNodes[0];
+    const firstNode = allNodes[0];
 
-    // 2. SceneNode인지 확인
-    if (node.type === 'PAGE' || node.type === 'DOCUMENT') {
+    if (!firstNode) {
+      figma.ui.postMessage({
+        type: 'palette-added',
+        error: '노드를 찾을 수 없습니다.',
+      });
+      return;
+    }
+
+    // 2. SceneNode인지 확인 (PAGE와 DOCUMENT는 BaseNode이지만 SceneNode가 아님)
+    if (firstNode.type === 'PAGE' || firstNode.type === 'DOCUMENT') {
       figma.ui.postMessage({
         type: 'palette-added',
         error: 'PAGE 또는 DOCUMENT 노드는 팔레트로 사용할 수 없습니다. 구체적인 Frame이나 Component를 선택해주세요.',
       });
       return;
     }
+
+    const node = firstNode as SceneNode;
 
     // 3. 색상 추출할 노드 찾기
     const targetNodes: SceneNode[] = [];
@@ -132,9 +142,12 @@ async function addUrlPalette(request: AddUrlPaletteRequest): Promise<void> {
       // filterNodeName이 있으면 해당 이름의 하위 노드만 찾기
       if ('findAll' in node) {
         const filtered = node.findAll(
-          (child) => child.type !== 'PAGE' && child.name === request.filterNodeName
-        );
-        targetNodes.push(...(filtered.filter((n): n is SceneNode => n.type !== 'PAGE')));
+          (child) =>
+            child.type !== 'PAGE' &&
+            child.type !== 'DOCUMENT' &&
+            child.name === request.filterNodeName
+        ) as SceneNode[];
+        targetNodes.push(...filtered);
       }
 
       if (targetNodes.length === 0) {
@@ -146,11 +159,13 @@ async function addUrlPalette(request: AddUrlPaletteRequest): Promise<void> {
       }
     } else {
       // filterNodeName이 없으면 전체 노드
-      targetNodes.push(node as SceneNode);
+      targetNodes.push(node);
 
       if ('findAll' in node) {
-        const children = node.findAll((child) => child.type !== 'PAGE');
-        targetNodes.push(...(children.filter((n): n is SceneNode => n.type !== 'PAGE')));
+        const children = node.findAll(
+          (child) => child.type !== 'PAGE' && child.type !== 'DOCUMENT'
+        ) as SceneNode[];
+        targetNodes.push(...children);
       }
     }
 
@@ -167,15 +182,16 @@ async function addUrlPalette(request: AddUrlPaletteRequest): Promise<void> {
 
     // 5. PaletteInfo 생성
     const currentFileKey = figma.fileKey ?? 'unknown';
-    const nodeName = (node as SceneNode).name;
+    const nodeName = node.name;
     const palette: PaletteInfo = {
-      id: `${currentFileKey}-${request.nodeId}-${Date.now()}`,
+      id: `${currentFileKey}-${request.layerName}-${Date.now()}`,
       name: request.paletteName ?? nodeName,
       sourceType: 'url',
       colorCount: colors.length,
       fileKey: currentFileKey,
-      nodeId: request.nodeId,
+      layerName: request.layerName,
       createdAt: Date.now(),
+      colors,
     };
 
     // 6. Storage에 저장 (색상 정보도 함께 저장)

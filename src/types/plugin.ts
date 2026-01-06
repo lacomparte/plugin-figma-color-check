@@ -59,8 +59,9 @@ export interface PaletteInfo {
   readonly sourceType: PaletteSourceType;
   readonly colorCount: number;
   readonly fileKey: string; // Figma file key
-  readonly nodeId: string; // Figma node ID (예: "4689:197350")
+  readonly layerName: string; // Layer 이름
   readonly createdAt: number; // 생성 시간
+  readonly colors?: readonly ColorToken[]; // 색상 목록 (선택적)
 }
 
 /**
