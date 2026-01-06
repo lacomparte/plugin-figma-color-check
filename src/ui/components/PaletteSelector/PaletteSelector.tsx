@@ -1,156 +1,226 @@
-import { useCallback, useEffect, useMemo, useState, type ChangeEvent, type ReactNode } from 'react';
-import type { PaletteInfo } from '@/types';
+import { useCallback, useEffect, useState, type ChangeEvent, type ReactNode } from 'react';
+import type { ColorPropertyType } from '@/types';
 import { useScan } from '../../context/ScanContext';
-import { useDebounce } from '../../hooks/useDebounce';
 import styles from './PaletteSelector.module.css';
 
-/**
- * 순수 함수: 문자열 정규화 (공백 제거, 소문자)
- */
-const normalizeString = (str: string): string => str.toLowerCase().replace(/\s+/g, '');
-
-/**
- * 순수 함수: 팔레트 필터링 (공백 무시, 대소문자 무시)
- */
-const filterPalettes = (
-  palettes: readonly PaletteInfo[],
-  query: string
-): readonly PaletteInfo[] => {
-  if (query.trim() === '') {
-    return palettes;
-  }
-  const normalizedQuery = normalizeString(query);
-  return palettes.filter((palette) => normalizeString(palette.name).includes(normalizedQuery));
-};
-
-/**
- * 순수 함수: 소스 타입 레이블
- */
-const getSourceTypeLabel = (sourceType: PaletteInfo['sourceType']): string => {
-  switch (sourceType) {
-    case 'variable':
-      return 'Variables';
-    case 'page':
-      return '페이지';
-  }
-};
-
 export const PaletteSelector = (): ReactNode => {
-  const { state, selectPalette, loadVariableCollections, loadPages, goToPage, allPalettes } =
+  const { state, selectPalette, addUrlPalette, deletePalette, loadSavedPalettes, clearError } =
     useScan();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [isOpen, setIsOpen] = useState(false);
 
-  const debouncedQuery = useDebounce(searchQuery, 200);
+  // Form state
+  const [layerName, setLayerName] = useState('');
+  const [paletteName, setPaletteName] = useState('');
+  const [filterNodeName, setFilterNodeName] = useState('');
+  const [colorProperty, setColorProperty] = useState<ColorPropertyType>('all');
 
-  // 초기 로드 시 Variable Collections와 페이지 목록 가져오기
+  // Palette expansion state
+  const [expandedPaletteIds, setExpandedPaletteIds] = useState<Set<string>>(new Set());
+
+  // 초기 로드 시 저장된 팔레트 목록 가져오기
   useEffect(() => {
-    loadVariableCollections();
-    loadPages();
-  }, [loadVariableCollections, loadPages]);
+    loadSavedPalettes();
+  }, [loadSavedPalettes]);
 
-  const handleGoToPage = useCallback(
-    (event: React.MouseEvent, pageId: string): void => {
+  const handleAddPalette = useCallback((): void => {
+    if (!layerName.trim()) {
+      return;
+    }
+
+    addUrlPalette(
+      layerName.trim(),
+      paletteName.trim() || undefined,
+      filterNodeName.trim() || undefined,
+      colorProperty
+    );
+
+    // 입력 필드 초기화
+    setLayerName('');
+    setPaletteName('');
+    setFilterNodeName('');
+    setColorProperty('all');
+  }, [layerName, paletteName, filterNodeName, colorProperty, addUrlPalette]);
+
+  const handleDeletePalette = useCallback(
+    (paletteId: string, event: React.MouseEvent): void => {
       event.stopPropagation();
-      goToPage(pageId);
+      if (confirm('이 팔레트를 삭제하시겠습니까?')) {
+        deletePalette(paletteId);
+      }
     },
-    [goToPage]
+    [deletePalette]
   );
-
-  const filteredPalettes = useMemo(
-    () => filterPalettes(allPalettes, debouncedQuery),
-    [allPalettes, debouncedQuery]
-  );
-
-  const handleSearchChange = useCallback((event: ChangeEvent<HTMLInputElement>): void => {
-    setSearchQuery(event.target.value);
-    setIsOpen(true);
-  }, []);
 
   const handleSelectPalette = useCallback(
-    (palette: PaletteInfo): void => {
-      selectPalette(palette);
-      setSearchQuery('');
-      setIsOpen(false);
+    (event: ChangeEvent<HTMLSelectElement>): void => {
+      const paletteId = event.target.value;
+      const palette = state.savedPalettes.find((p) => p.id === paletteId);
+      if (palette) {
+        selectPalette(palette);
+      }
     },
-    [selectPalette]
+    [state.savedPalettes, selectPalette]
   );
 
-  const handleInputFocus = useCallback((): void => {
-    setIsOpen(true);
-  }, []);
-
-  const handleInputBlur = useCallback((): void => {
-    // 약간의 지연을 두어 클릭 이벤트가 처리되도록 함
-    setTimeout(() => {
-      setIsOpen(false);
-    }, 150);
+  const togglePaletteExpansion = useCallback((paletteId: string): void => {
+    setExpandedPaletteIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(paletteId)) {
+        next.delete(paletteId);
+      } else {
+        next.add(paletteId);
+      }
+      return next;
+    });
   }, []);
 
   return (
     <div className={styles.container}>
-      <label className={styles.label} htmlFor="palette-search">
-        참조 팔레트
-      </label>
-      <div className={styles.selectorWrapper}>
+      <label className={styles.label}>참조 팔레트</label>
+
+      {/* 팔레트 추가 폼 */}
+      <div className={styles.addForm}>
         <input
-          autoComplete="off"
           className={styles.input}
-          id="palette-search"
-          placeholder={state.selectedPalette?.name ?? '팔레트 검색...'}
+          placeholder="Layer 이름 (예: Frame 1171278887)"
           type="text"
-          value={searchQuery}
-          onBlur={handleInputBlur}
-          onChange={handleSearchChange}
-          onFocus={handleInputFocus}
+          value={layerName}
+          onChange={(e) => setLayerName(e.target.value)}
         />
-        {state.selectedPalette !== null && searchQuery === '' && (
-          <div className={styles.selectedBadge}>
-            <span className={styles.selectedName}>{state.selectedPalette.name}</span>
-            <span className={styles.sourceType}>
-              {getSourceTypeLabel(state.selectedPalette.sourceType)}
-            </span>
+
+        <input
+          className={styles.input}
+          placeholder="필터링할 노드 이름 (선택, 예: box)"
+          type="text"
+          value={filterNodeName}
+          onChange={(e) => setFilterNodeName(e.target.value)}
+        />
+
+        <select
+          className={styles.select}
+          value={colorProperty}
+          onChange={(e) => setColorProperty(e.target.value as ColorPropertyType)}
+        >
+          <option value="all">모든 색상</option>
+          <option value="fills">배경 색상 (Fills)</option>
+          <option value="strokes">테두리 색상 (Strokes)</option>
+          <option value="text">텍스트 색상 (Text)</option>
+          <option value="effects">효과 색상 (Effects)</option>
+        </select>
+
+        <input
+          className={styles.input}
+          placeholder="팔레트 이름 (선택, 비어있으면 Layer 이름 사용)"
+          type="text"
+          value={paletteName}
+          onChange={(e) => setPaletteName(e.target.value)}
+        />
+
+        {/* Error message above button with dismiss */}
+        {state.error && (
+          <div className={styles.errorBanner}>
+            <span className={styles.errorText}>{state.error}</span>
+            <button
+              className={styles.errorCloseButton}
+              type="button"
+              onClick={clearError}
+              aria-label="에러 닫기"
+            >
+              ✕
+            </button>
           </div>
         )}
-        {isOpen && filteredPalettes.length > 0 ? (
-          <ul className={styles.dropdown}>
-            {filteredPalettes.map((palette) => (
-              <li key={palette.id} className={styles.dropdownItem}>
-                <button
-                  className={styles.dropdownButton}
-                  type="button"
-                  onClick={() => {
-                    handleSelectPalette(palette);
-                  }}
-                >
-                  <span className={styles.paletteName}>{palette.name}</span>
-                  <span className={styles.paletteInfo}>
-                    <span className={styles.sourceTag}>
-                      {getSourceTypeLabel(palette.sourceType)}
-                    </span>
-                    <span className={styles.colorCount}>{palette.colorCount}색</span>
-                  </span>
-                </button>
-                {palette.sourceType === 'page' && palette.pageId !== undefined && (
-                  <button
-                    className={styles.goToButton}
-                    title="페이지로 이동"
-                    type="button"
-                    onClick={(e) => {
-                      handleGoToPage(e, palette.pageId!);
-                    }}
-                  >
-                    →
-                  </button>
-                )}
-              </li>
-            ))}
-          </ul>
-        ) : null}
-        {isOpen && filteredPalettes.length === 0 && searchQuery !== '' ? (
-          <div className={styles.noResults}>검색 결과가 없습니다</div>
+
+        <button
+          className={styles.addButton}
+          disabled={!layerName.trim()}
+          type="button"
+          onClick={handleAddPalette}
+        >
+          팔레트에 추가
+        </button>
+      </div>
+
+      {/* 저장된 팔레트 선택 */}
+      <div className={styles.selectorWrapper}>
+        <select
+          className={styles.select}
+          value={state.selectedPalette?.id ?? ''}
+          onChange={handleSelectPalette}
+        >
+          <option value="">팔레트를 선택하세요...</option>
+          {state.savedPalettes.map((palette) => (
+            <option key={palette.id} value={palette.id}>
+              {palette.name} ({palette.colorCount}색)
+            </option>
+          ))}
+        </select>
+
+        {/* 선택된 팔레트 정보 & 삭제 버튼 */}
+        {state !== null && state.selectedPalette !== null && state.selectedPalette.id !== null ? (
+          <div className={styles.selectedInfo}>
+            <span className={styles.selectedName}>{state.selectedPalette.name}</span>
+            <span className={styles.colorCount}>({state.selectedPalette.colorCount}색)</span>
+            <button
+              className={styles.deleteButton}
+              title="팔레트 삭제"
+              type="button"
+              onClick={(e) => handleDeletePalette(state.selectedPalette?.id || '', e)}
+            >
+              ✕
+            </button>
+          </div>
         ) : null}
       </div>
+
+      {/* Palette 목록 with expand/collapse */}
+      {state.savedPalettes.length > 0 && (
+        <div className={styles.paletteList}>
+          <h3 className={styles.paletteListTitle}>저장된 팔레트 목록</h3>
+          {state.savedPalettes.map((palette) => {
+            const isExpanded = expandedPaletteIds.has(palette.id);
+            return (
+              <div key={palette.id} className={styles.paletteItem}>
+                <div className={styles.paletteHeader}>
+                  <button
+                    className={styles.expandButton}
+                    type="button"
+                    onClick={() => togglePaletteExpansion(palette.id)}
+                    aria-label={isExpanded ? '접기' : '펼치기'}
+                  >
+                    {isExpanded ? '▼' : '▶'}
+                  </button>
+                  <span className={styles.paletteName}>
+                    {palette.name} ({palette.colorCount}색)
+                  </span>
+                  <button
+                    className={styles.paletteDeleteButton}
+                    title="팔레트 삭제"
+                    type="button"
+                    onClick={(e) => handleDeletePalette(palette.id, e)}
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                {isExpanded && palette.colors && (
+                  <div className={styles.colorGrid}>
+                    {palette.colors.map((color) => (
+                      <div key={color.hex} className={styles.colorItem}>
+                        <div
+                          className={styles.colorSwatch}
+                          style={{ backgroundColor: color.hex }}
+                          title={color.hex}
+                        />
+                        <span className={styles.colorHex}>{color.hex}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 };

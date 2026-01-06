@@ -9,53 +9,13 @@ import {
 } from './utils/colorUtils';
 import { determineColorFamily } from './utils/colorCategory';
 import type { ColorToken } from './tokens/colors';
-
-// ============================================
-// 타입 정의
-// ============================================
-
-type PaletteSourceType = 'variable' | 'page';
-
-interface PageInfo {
-  id: string;
-  name: string;
-  colorCount: number;
-}
-
-interface ColorUsage {
-  nodeId: string;
-  nodeName: string;
-  nodeType: string;
-  propertyType: 'fill' | 'stroke';
-  color: {
-    r: number;
-    g: number;
-    b: number;
-    opacity?: number;
-  };
-  hex: string;
-  isValid: boolean;
-  colorFamily: string;
-  suggestion?: {
-    name: string;
-    hex: string;
-    distance: number;
-  };
-}
-
-interface ScanResult {
-  totalNodes: number;
-  totalColors: number;
-  validColors: number;
-  invalidColors: number;
-  colorUsages: ColorUsage[];
-}
-
-interface VariableCollectionInfo {
-  id: string;
-  name: string;
-  colorCount: number;
-}
+import type {
+  PluginMessageToCode,
+  PaletteInfo,
+  AddUrlPaletteRequest,
+  ColorUsage,
+  ScanResult,
+} from './types';
 
 // ============================================
 // UI 초기화
@@ -68,54 +28,25 @@ figma.showUI(__html__, {
 });
 
 // ============================================
+// Storage Key
+// ============================================
+
+const STORAGE_KEY = 'savedPalettes';
+
+// ============================================
 // 메시지 핸들러
 // ============================================
 
-interface ScanPayload {
-  paletteId: string;
-  sourceType: PaletteSourceType;
-}
-
-interface FixColorPayload {
-  nodeId: string;
-  propertyType: 'fill' | 'stroke';
-  originalHex: string;
-  targetHex: string;
-}
-
-interface FixAllPayload {
-  fixes: FixColorPayload[];
-}
-
-interface SelectNodePayload {
-  nodeId: string;
-}
-
-interface GoToPagePayload {
-  pageId: string;
-}
-
-type PluginMessage =
-  | { type: 'scan-selection'; payload: ScanPayload }
-  | { type: 'scan-page'; payload: ScanPayload }
-  | { type: 'fix-color'; payload: FixColorPayload }
-  | { type: 'fix-all'; payload: FixAllPayload }
-  | { type: 'select-node'; payload: SelectNodePayload }
-  | { type: 'get-variable-collections' }
-  | { type: 'get-pages' }
-  | { type: 'go-to-page'; payload: GoToPagePayload }
-  | { type: 'cancel' };
-
-figma.ui.onmessage = (msg: PluginMessage): void => {
+figma.ui.onmessage = (msg: PluginMessageToCode): void => {
   console.log('[code.ts] Received message:', msg.type);
   void (async (): Promise<void> => {
     switch (msg.type) {
       case 'scan-selection':
-        await setupPalette(msg.payload);
+        await setupPalette(msg.payload.paletteId);
         await scanSelection();
         break;
       case 'scan-page':
-        await setupPalette(msg.payload);
+        await setupPalette(msg.payload.paletteId);
         await scanCurrentPage();
         break;
       case 'fix-color':
@@ -127,14 +58,14 @@ figma.ui.onmessage = (msg: PluginMessage): void => {
       case 'select-node':
         await selectNode(msg.payload.nodeId);
         break;
-      case 'get-variable-collections':
-        await getVariableCollections();
+      case 'add-url-palette':
+        await addUrlPalette(msg.payload);
         break;
-      case 'get-pages':
-        await getPages();
+      case 'get-saved-palettes':
+        await getSavedPalettes();
         break;
-      case 'go-to-page':
-        await goToPage(msg.payload.pageId);
+      case 'delete-palette':
+        await deletePalette(msg.payload.paletteId);
         break;
       case 'cancel':
         figma.closePlugin();
@@ -144,151 +75,242 @@ figma.ui.onmessage = (msg: PluginMessage): void => {
 };
 
 // ============================================
-// Variable Collections API
+// Palette Storage Functions
 // ============================================
 
 /**
- * Figma Variable Collections 조회
+ * 저장된 팔레트 목록 불러오기
  */
-async function getVariableCollections(): Promise<void> {
+async function getSavedPalettes(): Promise<void> {
   try {
-    const collections = await figma.variables.getLocalVariableCollectionsAsync();
-    const colorVariables = await figma.variables.getLocalVariablesAsync('COLOR');
-
-    const result: VariableCollectionInfo[] = collections.map((collection) => {
-      const collectionColors = colorVariables.filter(
-        (v) => v.variableCollectionId === collection.id
-      );
-      return {
-        id: collection.id,
-        name: collection.name,
-        colorCount: collectionColors.length,
-      };
-    });
-
+    const palettes = (await figma.clientStorage.getAsync(STORAGE_KEY)) as PaletteInfo[] | undefined;
     figma.ui.postMessage({
-      type: 'variable-collections',
-      data: result,
-    });
-  } catch (_error) {
-    figma.ui.postMessage({
-      type: 'variable-collections',
-      error: 'Variable Collections를 불러올 수 없습니다.',
-    });
-  }
-}
-
-/**
- * Variable Collection에서 색상 팔레트 로드
- */
-async function loadVariableColors(collectionId: string): Promise<ColorToken[]> {
-  const colorVariables = await figma.variables.getLocalVariablesAsync('COLOR');
-  const collectionColors = colorVariables.filter((v) => v.variableCollectionId === collectionId);
-
-  const colors: ColorToken[] = [];
-
-  for (const variable of collectionColors) {
-    // 첫 번째 모드의 값 사용
-    const modeIds = Object.keys(variable.valuesByMode);
-    const firstModeId = modeIds[0];
-    if (firstModeId === undefined) continue;
-
-    const value = variable.valuesByMode[firstModeId];
-    if (value === undefined) continue;
-
-    // RGBA 타입 확인
-    if (
-      typeof value === 'object' &&
-      value !== null &&
-      'r' in value &&
-      'g' in value &&
-      'b' in value
-    ) {
-      const rgbaValue = value as { r: number; g: number; b: number; a?: number };
-      const r = Math.round(rgbaValue.r * 255);
-      const g = Math.round(rgbaValue.g * 255);
-      const b = Math.round(rgbaValue.b * 255);
-      const opacity = rgbaValue.a;
-
-      colors.push({
-        name: variable.name,
-        hex: figmaRgbToHex(rgbaValue.r, rgbaValue.g, rgbaValue.b),
-        rgb: { r, g, b },
-        opacity: opacity !== undefined && opacity < 1 ? opacity : undefined,
-        category: 'grayscale', // Variable에서는 카테고리 구분 없음
-      });
-    }
-  }
-
-  return colors;
-}
-
-// ============================================
-// Pages API
-// ============================================
-
-/**
- * 현재 파일의 모든 페이지 목록 조회
- */
-async function getPages(): Promise<void> {
-  console.log('[code.ts] getPages called');
-  try {
-    // 모든 페이지를 먼저 로드해야 children에 접근 가능
-    await figma.loadAllPagesAsync();
-
-    const pages = figma.root.children;
-    console.log('[code.ts] Found pages:', pages.length);
-    const result: PageInfo[] = pages.map((page) => {
-      const colorCount = countColorsInPage(page);
-      console.log('[code.ts] Page:', page.name, 'colorCount:', colorCount);
-      return {
-        id: page.id,
-        name: page.name,
-        colorCount,
-      };
-    });
-
-    console.log('[code.ts] Sending pages message:', result);
-    figma.ui.postMessage({
-      type: 'pages',
-      data: result,
+      type: 'saved-palettes',
+      data: palettes ?? [],
     });
   } catch (error) {
-    console.error('[code.ts] getPages error:', error);
+    console.error('[getSavedPalettes] Error:', error);
     figma.ui.postMessage({
-      type: 'pages',
-      error: '페이지 목록을 불러올 수 없습니다.',
+      type: 'saved-palettes',
+      data: [],
     });
   }
 }
 
 /**
- * 페이지 내 고유 색상 수 계산
+ * URL 기반 팔레트 추가
  */
-function countColorsInPage(page: PageNode): number {
-  const colors = new Set<string>();
+async function addUrlPalette(request: AddUrlPaletteRequest): Promise<void> {
+  try {
+    // 1. Layer 이름으로 노드 찾기
+    const allNodes = figma.currentPage.findAll((n) => n.name === request.layerName);
+
+    if (allNodes.length === 0) {
+      figma.ui.postMessage({
+        type: 'palette-added',
+        error: `"${request.layerName}" 이름의 레이어를 찾을 수 없습니다.`,
+      });
+      return;
+    }
+
+    // 여러 개 발견되면 첫 번째 사용
+    const node = allNodes[0];
+
+    // 2. SceneNode인지 확인
+    if (node.type === 'PAGE' || node.type === 'DOCUMENT') {
+      figma.ui.postMessage({
+        type: 'palette-added',
+        error: 'PAGE 또는 DOCUMENT 노드는 팔레트로 사용할 수 없습니다. 구체적인 Frame이나 Component를 선택해주세요.',
+      });
+      return;
+    }
+
+    // 3. 색상 추출할 노드 찾기
+    const targetNodes: SceneNode[] = [];
+
+    if (request.filterNodeName) {
+      // filterNodeName이 있으면 해당 이름의 하위 노드만 찾기
+      if ('findAll' in node) {
+        const filtered = node.findAll(
+          (child) => child.type !== 'PAGE' && child.name === request.filterNodeName
+        );
+        targetNodes.push(...(filtered.filter((n): n is SceneNode => n.type !== 'PAGE')));
+      }
+
+      if (targetNodes.length === 0) {
+        figma.ui.postMessage({
+          type: 'palette-added',
+          error: `"${request.filterNodeName}" 이름의 노드를 찾을 수 없습니다.`,
+        });
+        return;
+      }
+    } else {
+      // filterNodeName이 없으면 전체 노드
+      targetNodes.push(node as SceneNode);
+
+      if ('findAll' in node) {
+        const children = node.findAll((child) => child.type !== 'PAGE');
+        targetNodes.push(...(children.filter((n): n is SceneNode => n.type !== 'PAGE')));
+      }
+    }
+
+    // 4. 색상 추출 (속성별 필터링)
+    const colors = extractColorsFromNodes(targetNodes, request.colorProperty);
+
+    if (colors.length === 0) {
+      figma.ui.postMessage({
+        type: 'palette-added',
+        error: '노드에서 색상을 찾을 수 없습니다.',
+      });
+      return;
+    }
+
+    // 5. PaletteInfo 생성
+    const currentFileKey = figma.fileKey ?? 'unknown';
+    const nodeName = (node as SceneNode).name;
+    const palette: PaletteInfo = {
+      id: `${currentFileKey}-${request.nodeId}-${Date.now()}`,
+      name: request.paletteName ?? nodeName,
+      sourceType: 'url',
+      colorCount: colors.length,
+      fileKey: currentFileKey,
+      nodeId: request.nodeId,
+      createdAt: Date.now(),
+    };
+
+    // 6. Storage에 저장 (색상 정보도 함께 저장)
+    const palettes = (await figma.clientStorage.getAsync(STORAGE_KEY)) as PaletteInfo[] | undefined;
+    const updated = [...(palettes ?? []), palette];
+    await figma.clientStorage.setAsync(STORAGE_KEY, updated);
+
+    // 7. 색상 정보도 별도로 저장 (스캔 시 사용)
+    await figma.clientStorage.setAsync(`palette-colors-${palette.id}`, colors);
+
+    figma.ui.postMessage({
+      type: 'palette-added',
+      data: palette,
+    });
+
+    figma.notify(`팔레트 "${palette.name}" 추가됨 (${colors.length}색)`);
+  } catch (error) {
+    console.error('[addUrlPalette] Error:', error);
+    figma.ui.postMessage({
+      type: 'palette-added',
+      error: '팔레트 추가 중 오류가 발생했습니다.',
+    });
+  }
+}
+
+/**
+ * 노드 배열에서 색상 추출 (중복 제거)
+ */
+function extractColorsFromNodes(
+  nodes: readonly SceneNode[],
+  colorProperty: 'all' | 'fills' | 'strokes' | 'text' | 'effects' | undefined = 'all'
+): ColorToken[] {
+  const colorMap = new Map<string, ColorToken>();
 
   function traverse(node: SceneNode): void {
-    if ('fills' in node && node.fills !== figma.mixed) {
+    // fills 검사
+    if ((colorProperty === 'all' || colorProperty === 'fills') && 'fills' in node && node.fills !== figma.mixed) {
       const fills = node.fills as readonly Paint[];
       for (const fill of fills) {
         if (fill.type === 'SOLID' && fill.visible !== false) {
           const hex = figmaRgbToHex(fill.color.r, fill.color.g, fill.color.b);
-          colors.add(hex);
+          if (!colorMap.has(hex)) {
+            colorMap.set(hex, {
+              name: hex,
+              hex,
+              rgb: {
+                r: Math.round(fill.color.r * 255),
+                g: Math.round(fill.color.g * 255),
+                b: Math.round(fill.color.b * 255),
+              },
+              opacity: fill.opacity !== undefined && fill.opacity < 1 ? fill.opacity : undefined,
+              category: 'grayscale',
+            });
+          }
         }
       }
     }
 
-    if ('strokes' in node) {
+    // strokes 검사
+    if ((colorProperty === 'all' || colorProperty === 'strokes') && 'strokes' in node) {
       const strokes = node.strokes as readonly Paint[];
       for (const stroke of strokes) {
         if (stroke.type === 'SOLID' && stroke.visible !== false) {
           const hex = figmaRgbToHex(stroke.color.r, stroke.color.g, stroke.color.b);
-          colors.add(hex);
+          if (!colorMap.has(hex)) {
+            colorMap.set(hex, {
+              name: hex,
+              hex,
+              rgb: {
+                r: Math.round(stroke.color.r * 255),
+                g: Math.round(stroke.color.g * 255),
+                b: Math.round(stroke.color.b * 255),
+              },
+              opacity: stroke.opacity !== undefined && stroke.opacity < 1 ? stroke.opacity : undefined,
+              category: 'grayscale',
+            });
+          }
         }
       }
     }
 
+    // text 검사 (TEXT 노드의 fills)
+    if ((colorProperty === 'all' || colorProperty === 'text') && node.type === 'TEXT') {
+      const fills = node.fills;
+      if (fills !== figma.mixed) {
+        for (const fill of fills as readonly Paint[]) {
+          if (fill.type === 'SOLID' && fill.visible !== false) {
+            const hex = figmaRgbToHex(fill.color.r, fill.color.g, fill.color.b);
+            if (!colorMap.has(hex)) {
+              colorMap.set(hex, {
+                name: hex,
+                hex,
+                rgb: {
+                  r: Math.round(fill.color.r * 255),
+                  g: Math.round(fill.color.g * 255),
+                  b: Math.round(fill.color.b * 255),
+                },
+                opacity: fill.opacity !== undefined && fill.opacity < 1 ? fill.opacity : undefined,
+                category: 'grayscale',
+              });
+            }
+          }
+        }
+      }
+    }
+
+    // effects 검사 (그림자, 글로우 등)
+    if ((colorProperty === 'all' || colorProperty === 'effects') && 'effects' in node) {
+      const effects = node.effects;
+      for (const effect of effects) {
+        if (
+          (effect.type === 'DROP_SHADOW' || effect.type === 'INNER_SHADOW') &&
+          effect.visible !== false &&
+          'color' in effect
+        ) {
+          const hex = figmaRgbToHex(effect.color.r, effect.color.g, effect.color.b);
+          if (!colorMap.has(hex)) {
+            colorMap.set(hex, {
+              name: hex,
+              hex,
+              rgb: {
+                r: Math.round(effect.color.r * 255),
+                g: Math.round(effect.color.g * 255),
+                b: Math.round(effect.color.b * 255),
+              },
+              opacity:
+                effect.color.a !== undefined && effect.color.a < 1 ? effect.color.a : undefined,
+              category: 'grayscale',
+            });
+          }
+        }
+      }
+    }
+
+    // 자식 노드 탐색
     if ('children' in node) {
       for (const child of node.children) {
         traverse(child);
@@ -296,107 +318,48 @@ function countColorsInPage(page: PageNode): number {
     }
   }
 
-  for (const child of page.children) {
-    traverse(child);
+  for (const node of nodes) {
+    traverse(node);
   }
 
-  return colors.size;
+  return Array.from(colorMap.values());
 }
 
 /**
- * 특정 페이지로 이동
+ * 팔레트 삭제
  */
-async function goToPage(pageId: string): Promise<void> {
-  const page = figma.root.children.find((p) => p.id === pageId);
-  if (page !== undefined) {
-    await figma.setCurrentPageAsync(page);
-    figma.notify(`${page.name} 페이지로 이동했습니다.`);
+async function deletePalette(paletteId: string): Promise<void> {
+  try {
+    const palettes = (await figma.clientStorage.getAsync(STORAGE_KEY)) as PaletteInfo[] | undefined;
+    const updated = (palettes ?? []).filter((p) => p.id !== paletteId);
+    await figma.clientStorage.setAsync(STORAGE_KEY, updated);
+
+    // 색상 정보도 삭제
+    await figma.clientStorage.deleteAsync(`palette-colors-${paletteId}`);
+
+    figma.ui.postMessage({
+      type: 'palette-deleted',
+      paletteId,
+    });
+
+    figma.notify('팔레트가 삭제되었습니다.');
+  } catch (error) {
+    console.error('[deletePalette] Error:', error);
+  }
+}
+
+/**
+ * 팔레트 설정 (스캔 전에 호출)
+ */
+async function setupPalette(paletteId: string): Promise<void> {
+  const colors = (await figma.clientStorage.getAsync(
+    `palette-colors-${paletteId}`
+  )) as ColorToken[] | undefined;
+
+  if (colors && colors.length > 0) {
+    setActiveVariableColors(colors);
   } else {
-    figma.notify('페이지를 찾을 수 없습니다.', { error: true });
-  }
-}
-
-/**
- * 페이지에서 색상 팔레트 추출
- */
-async function loadPageColors(pageId: string): Promise<ColorToken[]> {
-  const page = figma.root.children.find((p) => p.id === pageId);
-  if (page === undefined) return [];
-
-  // 페이지 데이터를 먼저 로드해야 children에 접근 가능
-  await page.loadAsync();
-
-  const colorMap = new Map<string, { r: number; g: number; b: number; name: string }>();
-
-  function traverse(node: SceneNode): void {
-    if ('fills' in node && node.fills !== figma.mixed) {
-      const fills = node.fills as readonly Paint[];
-      for (const fill of fills) {
-        if (fill.type === 'SOLID' && fill.visible !== false) {
-          const hex = figmaRgbToHex(fill.color.r, fill.color.g, fill.color.b);
-          if (!colorMap.has(hex)) {
-            colorMap.set(hex, {
-              r: Math.round(fill.color.r * 255),
-              g: Math.round(fill.color.g * 255),
-              b: Math.round(fill.color.b * 255),
-              name: node.name,
-            });
-          }
-        }
-      }
-    }
-
-    if ('strokes' in node) {
-      const strokes = node.strokes as readonly Paint[];
-      for (const stroke of strokes) {
-        if (stroke.type === 'SOLID' && stroke.visible !== false) {
-          const hex = figmaRgbToHex(stroke.color.r, stroke.color.g, stroke.color.b);
-          if (!colorMap.has(hex)) {
-            colorMap.set(hex, {
-              r: Math.round(stroke.color.r * 255),
-              g: Math.round(stroke.color.g * 255),
-              b: Math.round(stroke.color.b * 255),
-              name: node.name,
-            });
-          }
-        }
-      }
-    }
-
-    if ('children' in node) {
-      for (const child of node.children) {
-        traverse(child);
-      }
-    }
-  }
-
-  for (const child of page.children) {
-    traverse(child);
-  }
-
-  const colors: ColorToken[] = [];
-  colorMap.forEach((value, hex) => {
-    colors.push({
-      name: hex,
-      hex,
-      rgb: { r: value.r, g: value.g, b: value.b },
-      category: 'grayscale',
-    });
-  });
-
-  return colors;
-}
-
-/**
- * 팔레트 설정
- */
-async function setupPalette(payload: ScanPayload): Promise<void> {
-  if (payload.sourceType === 'variable') {
-    const colors = await loadVariableColors(payload.paletteId);
-    setActiveVariableColors(colors);
-  } else if (payload.sourceType === 'page') {
-    const colors = await loadPageColors(payload.paletteId);
-    setActiveVariableColors(colors);
+    console.warn('[setupPalette] No colors found for palette:', paletteId);
   }
 }
 
@@ -543,7 +506,12 @@ function createColorUsage(
 /**
  * 단일 색상 수정
  */
-async function fixColor(payload: FixColorPayload): Promise<void> {
+async function fixColor(payload: {
+  nodeId: string;
+  propertyType: 'fill' | 'stroke';
+  originalHex: string;
+  targetHex: string;
+}): Promise<void> {
   const baseNode = await figma.getNodeByIdAsync(payload.nodeId);
 
   if (baseNode === null) {
@@ -628,7 +596,14 @@ async function fixColor(payload: FixColorPayload): Promise<void> {
 /**
  * 모든 위반 색상 일괄 수정
  */
-async function fixAllColors(payload: FixAllPayload): Promise<void> {
+async function fixAllColors(payload: {
+  fixes: readonly {
+    nodeId: string;
+    propertyType: 'fill' | 'stroke';
+    originalHex: string;
+    targetHex: string;
+  }[];
+}): Promise<void> {
   let fixedCount = 0;
 
   for (const fix of payload.fixes) {
