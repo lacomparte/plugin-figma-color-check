@@ -1,5 +1,7 @@
 // 플러그인 전역 타입 정의
 
+import type { ColorToken } from '../tokens/colors';
+
 /**
  * 색상 사용 정보
  */

@@ -98,6 +98,13 @@ async function getSavedPalettes(): Promise<void> {
 }
 
 /**
+ * SceneNode 타입 가드
+ */
+function isSceneNode(node: BaseNode): node is SceneNode {
+  return node.type !== 'PAGE' && node.type !== 'DOCUMENT';
+}
+
+/**
  * URL 기반 팔레트 추가
  */
 async function addUrlPalette(request: AddUrlPaletteRequest): Promise<void> {
@@ -125,15 +132,16 @@ async function addUrlPalette(request: AddUrlPaletteRequest): Promise<void> {
     }
 
     // 2. SceneNode인지 확인 (PAGE와 DOCUMENT는 BaseNode이지만 SceneNode가 아님)
-    if (firstNode.type === 'PAGE' || firstNode.type === 'DOCUMENT') {
+    if (!isSceneNode(firstNode)) {
       figma.ui.postMessage({
         type: 'palette-added',
-        error: 'PAGE 또는 DOCUMENT 노드는 팔레트로 사용할 수 없습니다. 구체적인 Frame이나 Component를 선택해주세요.',
+        error:
+          'PAGE 또는 DOCUMENT 노드는 팔레트로 사용할 수 없습니다. 구체적인 Frame이나 Component를 선택해주세요.',
       });
       return;
     }
 
-    const node = firstNode as SceneNode;
+    const node = firstNode;
 
     // 3. 색상 추출할 노드 찾기
     const targetNodes: SceneNode[] = [];
@@ -141,12 +149,9 @@ async function addUrlPalette(request: AddUrlPaletteRequest): Promise<void> {
     if (request.filterNodeName) {
       // filterNodeName이 있으면 해당 이름의 하위 노드만 찾기
       if ('findAll' in node) {
-        const filtered = node.findAll(
-          (child) =>
-            child.type !== 'PAGE' &&
-            child.type !== 'DOCUMENT' &&
-            child.name === request.filterNodeName
-        ) as SceneNode[];
+        const filtered = node
+          .findAll((child) => isSceneNode(child) && child.name === request.filterNodeName)
+          .filter(isSceneNode);
         targetNodes.push(...filtered);
       }
 
@@ -162,9 +167,7 @@ async function addUrlPalette(request: AddUrlPaletteRequest): Promise<void> {
       targetNodes.push(node);
 
       if ('findAll' in node) {
-        const children = node.findAll(
-          (child) => child.type !== 'PAGE' && child.type !== 'DOCUMENT'
-        ) as SceneNode[];
+        const children = node.findAll(isSceneNode).filter(isSceneNode);
         targetNodes.push(...children);
       }
     }
@@ -228,7 +231,11 @@ function extractColorsFromNodes(
 
   function traverse(node: SceneNode): void {
     // fills 검사
-    if ((colorProperty === 'all' || colorProperty === 'fills') && 'fills' in node && node.fills !== figma.mixed) {
+    if (
+      (colorProperty === 'all' || colorProperty === 'fills') &&
+      'fills' in node &&
+      node.fills !== figma.mixed
+    ) {
       const fills = node.fills as readonly Paint[];
       for (const fill of fills) {
         if (fill.type === 'SOLID' && fill.visible !== false) {
@@ -265,7 +272,8 @@ function extractColorsFromNodes(
                 g: Math.round(stroke.color.g * 255),
                 b: Math.round(stroke.color.b * 255),
               },
-              opacity: stroke.opacity !== undefined && stroke.opacity < 1 ? stroke.opacity : undefined,
+              opacity:
+                stroke.opacity !== undefined && stroke.opacity < 1 ? stroke.opacity : undefined,
               category: 'grayscale',
             });
           }
@@ -368,9 +376,9 @@ async function deletePalette(paletteId: string): Promise<void> {
  * 팔레트 설정 (스캔 전에 호출)
  */
 async function setupPalette(paletteId: string): Promise<void> {
-  const colors = (await figma.clientStorage.getAsync(
-    `palette-colors-${paletteId}`
-  )) as ColorToken[] | undefined;
+  const colors = (await figma.clientStorage.getAsync(`palette-colors-${paletteId}`)) as
+    | ColorToken[]
+    | undefined;
 
   if (colors && colors.length > 0) {
     setActiveVariableColors(colors);
