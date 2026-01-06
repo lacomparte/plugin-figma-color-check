@@ -38,7 +38,6 @@ const STORAGE_KEY = 'savedPalettes';
 // ============================================
 
 figma.ui.onmessage = (msg: PluginMessageToCode): void => {
-  console.log('[code.ts] Received message:', msg.type);
   void (async (): Promise<void> => {
     switch (msg.type) {
       case 'scan-selection':

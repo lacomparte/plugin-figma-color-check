@@ -108,7 +108,6 @@ export const ScanProvider = ({ children }: ScanProviderProps): ReactNode => {
   const [state, dispatch] = useReducer(scanReducer, initialState);
 
   const handleMessage = useCallback((message: PluginMessageToUi): void => {
-    console.log('[ScanContext] Received message:', message.type, message);
     switch (message.type) {
       case 'scan-result':
         if ('error' in message) {
