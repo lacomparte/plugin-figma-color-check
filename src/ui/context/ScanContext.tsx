@@ -1,13 +1,11 @@
 import { createContext, useCallback, useContext, useMemo, useReducer, type ReactNode } from 'react';
 import type {
   ColorFixRequest,
+  ColorPropertyType,
   ColorUsage,
-  PageInfo,
   PaletteInfo,
-  PaletteSourceType,
   PluginMessageToUi,
   ScanResult,
-  VariableCollectionInfo,
 } from '@/types';
 import { useFigmaMessaging } from '../hooks/useFigmaMessaging';
 
@@ -20,8 +18,7 @@ interface ScanState {
   readonly error: string | null;
   readonly scanResult: ScanResult | null;
   readonly selectedPalette: PaletteInfo | null;
-  readonly variableCollections: readonly VariableCollectionInfo[];
-  readonly pages: readonly PageInfo[];
+  readonly savedPalettes: readonly PaletteInfo[];
 }
 
 const initialState: ScanState = {
@@ -29,8 +26,7 @@ const initialState: ScanState = {
   error: null,
   scanResult: null,
   selectedPalette: null,
-  variableCollections: [],
-  pages: [],
+  savedPalettes: [],
 };
 
 // ============================================
@@ -42,8 +38,9 @@ type ScanAction =
   | { type: 'SCAN_SUCCESS'; payload: ScanResult }
   | { type: 'SCAN_ERROR'; payload: string }
   | { type: 'SET_PALETTE'; payload: PaletteInfo }
-  | { type: 'SET_VARIABLE_COLLECTIONS'; payload: readonly VariableCollectionInfo[] }
-  | { type: 'SET_PAGES'; payload: readonly PageInfo[] }
+  | { type: 'SET_SAVED_PALETTES'; payload: readonly PaletteInfo[] }
+  | { type: 'ADD_PALETTE'; payload: PaletteInfo }
+  | { type: 'DELETE_PALETTE'; payload: string }
   | { type: 'CLEAR_ERROR' };
 
 const scanReducer = (state: ScanState, action: ScanAction): ScanState => {
@@ -56,10 +53,17 @@ const scanReducer = (state: ScanState, action: ScanAction): ScanState => {
       return { ...state, isLoading: false, error: action.payload };
     case 'SET_PALETTE':
       return { ...state, selectedPalette: action.payload };
-    case 'SET_VARIABLE_COLLECTIONS':
-      return { ...state, variableCollections: action.payload };
-    case 'SET_PAGES':
-      return { ...state, pages: action.payload };
+    case 'SET_SAVED_PALETTES':
+      return { ...state, savedPalettes: action.payload };
+    case 'ADD_PALETTE':
+      return { ...state, savedPalettes: [...state.savedPalettes, action.payload] };
+    case 'DELETE_PALETTE':
+      return {
+        ...state,
+        savedPalettes: state.savedPalettes.filter((p) => p.id !== action.payload),
+        selectedPalette:
+          state.selectedPalette?.id === action.payload ? null : state.selectedPalette,
+      };
     case 'CLEAR_ERROR':
       return { ...state, error: null };
     default:
@@ -79,11 +83,15 @@ interface ScanContextValue {
   readonly fixAllColors: () => void;
   readonly selectNode: (nodeId: string) => void;
   readonly selectPalette: (palette: PaletteInfo) => void;
-  readonly loadVariableCollections: () => void;
-  readonly loadPages: () => void;
-  readonly goToPage: (pageId: string) => void;
+  readonly addUrlPalette: (
+    layerName: string,
+    paletteName?: string,
+    filterNodeName?: string,
+    colorProperty?: ColorPropertyType
+  ) => void;
+  readonly deletePalette: (paletteId: string) => void;
+  readonly loadSavedPalettes: () => void;
   readonly clearError: () => void;
-  readonly allPalettes: readonly PaletteInfo[];
 }
 
 const ScanContext = createContext<ScanContextValue | null>(null);
@@ -109,76 +117,49 @@ export const ScanProvider = ({ children }: ScanProviderProps): ReactNode => {
           dispatch({ type: 'SCAN_SUCCESS', payload: message.data });
         }
         break;
-      case 'variable-collections':
-        if ('data' in message) {
-          console.log('[ScanContext] Setting variable collections:', message.data);
-          dispatch({ type: 'SET_VARIABLE_COLLECTIONS', payload: message.data });
+      case 'saved-palettes':
+        dispatch({ type: 'SET_SAVED_PALETTES', payload: message.data });
+        break;
+      case 'palette-added':
+        if ('error' in message) {
+          dispatch({ type: 'SCAN_ERROR', payload: message.error });
+        } else {
+          dispatch({ type: 'ADD_PALETTE', payload: message.data });
+          // 추가한 팔레트를 자동으로 선택
+          dispatch({ type: 'SET_PALETTE', payload: message.data });
         }
         break;
-      case 'pages':
-        if ('data' in message) {
-          console.log('[ScanContext] Setting pages:', message.data);
-          dispatch({ type: 'SET_PAGES', payload: message.data });
-          // 첫 번째 페이지를 기본 팔레트로 자동 선택
-          const firstPage = message.data[0];
-          if (firstPage !== undefined) {
-            console.log('[ScanContext] Auto-selecting first page:', firstPage);
-            dispatch({
-              type: 'SET_PALETTE',
-              payload: {
-                id: firstPage.id,
-                name: firstPage.name,
-                sourceType: 'page',
-                colorCount: firstPage.colorCount,
-                pageId: firstPage.id,
-              },
-            });
-          }
-        }
+      case 'palette-deleted':
+        dispatch({ type: 'DELETE_PALETTE', payload: message.paletteId });
         break;
     }
   }, []);
 
   const sendMessage = useFigmaMessaging(handleMessage);
 
-  const getCurrentPalettePayload = useCallback((): {
-    paletteId: string;
-    sourceType: PaletteSourceType;
-  } | null => {
-    if (state.selectedPalette === null) {
-      return null;
-    }
-    return {
-      paletteId: state.selectedPalette.id,
-      sourceType: state.selectedPalette.sourceType,
-    };
-  }, [state.selectedPalette]);
-
   const scanSelection = useCallback((): void => {
-    const payload = getCurrentPalettePayload();
-    if (payload === null) {
+    if (state.selectedPalette === null) {
       dispatch({ type: 'SCAN_ERROR', payload: '팔레트를 먼저 선택해주세요' });
       return;
     }
     dispatch({ type: 'START_SCAN' });
     sendMessage({
       type: 'scan-selection',
-      payload,
+      payload: { paletteId: state.selectedPalette.id },
     });
-  }, [sendMessage, getCurrentPalettePayload]);
+  }, [sendMessage, state.selectedPalette]);
 
   const scanPage = useCallback((): void => {
-    const payload = getCurrentPalettePayload();
-    if (payload === null) {
+    if (state.selectedPalette === null) {
       dispatch({ type: 'SCAN_ERROR', payload: '팔레트를 먼저 선택해주세요' });
       return;
     }
     dispatch({ type: 'START_SCAN' });
     sendMessage({
       type: 'scan-page',
-      payload,
+      payload: { paletteId: state.selectedPalette.id },
     });
-  }, [sendMessage, getCurrentPalettePayload]);
+  }, [sendMessage, state.selectedPalette]);
 
   const fixColor = useCallback(
     (usage: ColorUsage): void => {
@@ -225,50 +206,35 @@ export const ScanProvider = ({ children }: ScanProviderProps): ReactNode => {
     dispatch({ type: 'SET_PALETTE', payload: palette });
   }, []);
 
-  const loadVariableCollections = useCallback((): void => {
-    sendMessage({ type: 'get-variable-collections' });
-  }, [sendMessage]);
-
-  const loadPages = useCallback((): void => {
-    console.log('[ScanContext] Sending get-pages message');
-    sendMessage({ type: 'get-pages' });
-  }, [sendMessage]);
-
-  const goToPage = useCallback(
-    (pageId: string): void => {
-      sendMessage({ type: 'go-to-page', payload: { pageId } });
+  const addUrlPalette = useCallback(
+    (
+      layerName: string,
+      paletteName?: string,
+      filterNodeName?: string,
+      colorProperty?: ColorPropertyType
+    ): void => {
+      sendMessage({
+        type: 'add-url-palette',
+        payload: { layerName, paletteName, filterNodeName, colorProperty },
+      });
     },
     [sendMessage]
   );
 
+  const deletePalette = useCallback(
+    (paletteId: string): void => {
+      sendMessage({ type: 'delete-palette', payload: { paletteId } });
+    },
+    [sendMessage]
+  );
+
+  const loadSavedPalettes = useCallback((): void => {
+    sendMessage({ type: 'get-saved-palettes' });
+  }, [sendMessage]);
+
   const clearError = useCallback((): void => {
     dispatch({ type: 'CLEAR_ERROR' });
   }, []);
-
-  const allPalettes = useMemo((): readonly PaletteInfo[] => {
-    console.log(
-      '[ScanContext] Computing allPalettes. pages:',
-      state.pages,
-      'variableCollections:',
-      state.variableCollections
-    );
-    const variablePalettes: PaletteInfo[] = state.variableCollections.map((collection) => ({
-      id: collection.id,
-      name: collection.name,
-      sourceType: 'variable' as const,
-      colorCount: collection.colorCount,
-    }));
-    const pagePalettes: PaletteInfo[] = state.pages.map((page) => ({
-      id: page.id,
-      name: page.name,
-      sourceType: 'page' as const,
-      colorCount: page.colorCount,
-      pageId: page.id,
-    }));
-    const result = [...pagePalettes, ...variablePalettes];
-    console.log('[ScanContext] allPalettes result:', result);
-    return result;
-  }, [state.variableCollections, state.pages]);
 
   const contextValue = useMemo(
     (): ScanContextValue => ({
@@ -279,11 +245,10 @@ export const ScanProvider = ({ children }: ScanProviderProps): ReactNode => {
       fixAllColors,
       selectNode,
       selectPalette,
-      loadVariableCollections,
-      loadPages,
-      goToPage,
+      addUrlPalette,
+      deletePalette,
+      loadSavedPalettes,
       clearError,
-      allPalettes,
     }),
     [
       state,
@@ -293,11 +258,10 @@ export const ScanProvider = ({ children }: ScanProviderProps): ReactNode => {
       fixAllColors,
       selectNode,
       selectPalette,
-      loadVariableCollections,
-      loadPages,
-      goToPage,
+      addUrlPalette,
+      deletePalette,
+      loadSavedPalettes,
       clearError,
-      allPalettes,
     ]
   );
 

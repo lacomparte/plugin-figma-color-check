@@ -48,7 +48,7 @@ export interface ScanResult {
 /**
  * 팔레트 소스 타입
  */
-export type PaletteSourceType = 'variable' | 'page';
+export type PaletteSourceType = 'url';
 
 /**
  * 팔레트 정보
@@ -58,25 +58,24 @@ export interface PaletteInfo {
   readonly name: string;
   readonly sourceType: PaletteSourceType;
   readonly colorCount: number;
-  readonly pageId?: string; // page 타입일 때 페이지 ID
+  readonly fileKey: string; // Figma file key
+  readonly nodeId: string; // Figma node ID (예: "4689:197350")
+  readonly createdAt: number; // 생성 시간
 }
 
 /**
- * Figma 페이지 정보
+ * 색상 속성 타입
  */
-export interface PageInfo {
-  readonly id: string;
-  readonly name: string;
-  readonly colorCount: number;
-}
+export type ColorPropertyType = 'all' | 'fills' | 'strokes' | 'text' | 'effects';
 
 /**
- * Variable Collection 정보
+ * Layer 기반 팔레트 추가 요청
  */
-export interface VariableCollectionInfo {
-  readonly id: string;
-  readonly name: string;
-  readonly colorCount: number;
+export interface AddUrlPaletteRequest {
+  readonly layerName: string; // Layer 이름
+  readonly filterNodeName?: string; // 선택적: 특정 하위 노드만 색상 추출
+  readonly colorProperty?: ColorPropertyType; // 선택적: 추출할 색상 속성
+  readonly paletteName?: string; // 선택적: 사용자 지정 이름
 }
 
 /**
@@ -97,14 +96,14 @@ export interface ColorFixRequest {
  * UI → Code 메시지
  */
 export type PluginMessageToCode =
-  | { type: 'scan-selection'; payload: { paletteId: string; sourceType: PaletteSourceType } }
-  | { type: 'scan-page'; payload: { paletteId: string; sourceType: PaletteSourceType } }
+  | { type: 'scan-selection'; payload: { paletteId: string } }
+  | { type: 'scan-page'; payload: { paletteId: string } }
   | { type: 'fix-color'; payload: ColorFixRequest }
   | { type: 'fix-all'; payload: { fixes: readonly ColorFixRequest[] } }
   | { type: 'select-node'; payload: { nodeId: string } }
-  | { type: 'get-variable-collections' }
-  | { type: 'get-pages' }
-  | { type: 'go-to-page'; payload: { pageId: string } }
+  | { type: 'add-url-palette'; payload: AddUrlPaletteRequest }
+  | { type: 'get-saved-palettes' }
+  | { type: 'delete-palette'; payload: { paletteId: string } }
   | { type: 'cancel' };
 
 /**
@@ -113,7 +112,7 @@ export type PluginMessageToCode =
 export type PluginMessageToUi =
   | { type: 'scan-result'; data: ScanResult }
   | { type: 'scan-result'; error: string }
-  | { type: 'variable-collections'; data: readonly VariableCollectionInfo[] }
-  | { type: 'variable-collections'; error: string }
-  | { type: 'pages'; data: readonly PageInfo[] }
-  | { type: 'pages'; error: string };
+  | { type: 'saved-palettes'; data: readonly PaletteInfo[] }
+  | { type: 'palette-added'; data: PaletteInfo }
+  | { type: 'palette-added'; error: string }
+  | { type: 'palette-deleted'; paletteId: string };
