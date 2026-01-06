@@ -116,19 +116,19 @@ export const PaletteSelector = (): ReactNode => {
         />
 
         {/* Error message above button with dismiss */}
-        {state.error && (
+        {state.error ? (
           <div className={styles.errorBanner}>
             <span className={styles.errorText}>{state.error}</span>
             <button
+              aria-label="에러 닫기"
               className={styles.errorCloseButton}
               type="button"
               onClick={clearError}
-              aria-label="에러 닫기"
             >
               ✕
             </button>
           </div>
-        )}
+        ) : null}
 
         <button
           className={styles.addButton}
@@ -156,7 +156,7 @@ export const PaletteSelector = (): ReactNode => {
         </select>
 
         {/* 선택된 팔레트 정보 & 삭제 버튼 */}
-        {state !== null && state.selectedPalette !== null && state.selectedPalette.id !== null ? (
+        {state?.selectedPalette?.id ? (
           <div className={styles.selectedInfo}>
             <span className={styles.selectedName}>{state.selectedPalette.name}</span>
             <span className={styles.colorCount}>({state.selectedPalette.colorCount}색)</span>
@@ -164,7 +164,7 @@ export const PaletteSelector = (): ReactNode => {
               className={styles.deleteButton}
               title="팔레트 삭제"
               type="button"
-              onClick={(e) => handleDeletePalette(state.selectedPalette?.id || '', e)}
+              onClick={(e) => handleDeletePalette(state.selectedPalette?.id ?? '', e)}
             >
               ✕
             </button>
@@ -182,10 +182,10 @@ export const PaletteSelector = (): ReactNode => {
               <div key={palette.id} className={styles.paletteItem}>
                 <div className={styles.paletteHeader}>
                   <button
+                    aria-label={isExpanded ? '접기' : '펼치기'}
                     className={styles.expandButton}
                     type="button"
                     onClick={() => togglePaletteExpansion(palette.id)}
-                    aria-label={isExpanded ? '접기' : '펼치기'}
                   >
                     {isExpanded ? '▼' : '▶'}
                   </button>
@@ -202,7 +202,7 @@ export const PaletteSelector = (): ReactNode => {
                   </button>
                 </div>
 
-                {isExpanded && palette.colors && palette.colors.length > 0 && (
+                {isExpanded && palette.colors && palette.colors.length > 0 ? (
                   <div className={styles.colorGrid}>
                     {palette.colors.map((color: { hex: string; name: string }) => (
                       <div key={color.hex} className={styles.colorItem}>
@@ -215,7 +215,7 @@ export const PaletteSelector = (): ReactNode => {
                       </div>
                     ))}
                   </div>
-                )}
+                ) : null}
               </div>
             );
           })}
