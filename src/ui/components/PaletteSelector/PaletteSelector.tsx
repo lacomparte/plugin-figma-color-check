@@ -202,9 +202,9 @@ export const PaletteSelector = (): ReactNode => {
                   </button>
                 </div>
 
-                {isExpanded && palette.colors && (
+                {isExpanded && palette.colors && palette.colors.length > 0 && (
                   <div className={styles.colorGrid}>
-                    {palette.colors.map((color) => (
+                    {palette.colors.map((color: { hex: string; name: string }) => (
                       <div key={color.hex} className={styles.colorItem}>
                         <div
                           className={styles.colorSwatch}
